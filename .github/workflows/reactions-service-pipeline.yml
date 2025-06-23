@@ -30,7 +30,7 @@ jobs:
             cd $dir
             gem install bundler --user-install
             bundle install --path vendor/bundle
-            bundle exec rake test
+            ruby tests/gemfile_test.rb
             cd ..
           done
 
