@@ -25,7 +25,7 @@ jobs:
       # Step 4: Install dependencies for all microservices and run tests
       - name: Install dependencies and run tests
         run: |
-          export PATH="$HOME/.gem/ruby/3.2.0/bin:$PATH"
+          export PATH="$(ruby -e 'print Gem.user_dir')/bin:$PATH"
           for dir in count-likes-ms dislike-ms like-ms users-liked-ms; do
             cd $dir
             gem install bundler --user-install
