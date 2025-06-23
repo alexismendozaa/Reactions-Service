@@ -1,0 +1,36 @@
+openapi: 3.0.0
+info:
+  title: LikeMS API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /likes:
+    post:
+      summary: "Registrar un like"
+      operationId: "createLike"
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        description: "JSON con el ID del post al que se le registrará el like"
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                post_id:
+                  type: string
+                  format: uuid
+                  description: "ID del post al que se le registrará el like"
+      responses:
+        '201':
+          description: "Like registrado exitosamente"
+        '400':
+          description: "Error en los datos proporcionados"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
