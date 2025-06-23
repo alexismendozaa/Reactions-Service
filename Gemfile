@@ -61,4 +61,4 @@ gem 'rack-cors'
 gem 'rswag'
 gem 'dotenv-rails', groups: [:development, :test]
 gem 'grpc'
-gem 'grpc-tools'
+gem 'grpc-too
