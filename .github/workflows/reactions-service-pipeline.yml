@@ -1,0 +1,115 @@
+name: Docker Build and Deploy
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out the code
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      # Step 3: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      # Step 4: Install dependencies for all microservices and run tests
+      - name: Install dependencies and run tests
+        run: |
+          for dir in count-likes-ms dislike-ms like-ms users-liked-ms; do
+            cd $dir
+            gem install bundler
+            bundle install
+            bundle exec rake test
+            cd ..
+          done
+
+      # Step 5: Build Docker images using Docker Compose
+      - name: Build Docker images using Docker Compose
+        run: |
+          docker-compose -f docker-compose.yml build
+
+      # Step 6: Push Docker images to Docker Hub
+      - name: Push Docker images to Docker Hub
+        run: |
+          docker-compose -f docker-compose.yml push
+
+      # Step 7: Clean up existing containers on EC2
+      - name: Clean up existing containers on EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_QA }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY_QA }}
+          port: 22
+          debug: true
+          script: |
+            docker stop $(docker ps -aq) || true
+            docker rm $(docker ps -aq) || true
+            docker system prune -af || true
+
+      # Step 8: Deploy to EC2 via SSH
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_QA }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY_QA }}
+          port: 22
+          debug: true
+          script: |
+            # Export environment variables for all microservices
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
+            export DB_HOST=${{ secrets.DB_HOST }}
+            export DB_USERNAME=${{ secrets.DB_USERNAME }}
+            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export DB_NAME=${{ secrets.DB_NAME }}
+            export DB_R=${{ secrets.DB_R }}
+            export DB_U=${{ secrets.DB_U }}
+
+            # Run containers for each microservice
+            docker run -d --name count-likes-ms \
+              -p 5017:3017 \
+              -e JWT_SECRET=$JWT_SECRET \
+              -e DB_HOST=$DB_HOST \
+              -e DB_USERNAME=$DB_USERNAME \
+              -e DB_PASSWORD=$DB_PASSWORD \
+              -e DB_NAME=$DB_NAME \
+              alexismendozaa/count-likes-ms:latest
+
+            docker run -d --name dislike-ms \
+              -p 5016:3016 \
+              -e JWT_SECRET=$JWT_SECRET \
+              -e DB_HOST=$DB_HOST \
+              -e DB_USERNAME=$DB_USERNAME \
+              -e DB_PASSWORD=$DB_PASSWORD \
+              -e DB_NAME=$DB_NAME \
+              alexismendozaa/dislike-ms:latest
+
+            docker run -d --name like-ms \
+              -p 5015:3015 \
+              -e JWT_SECRET=$JWT_SECRET \
+              -e DB_HOST=$DB_HOST \
+              -e DB_USERNAME=$DB_USERNAME \
+              -e DB_PASSWORD=$DB_PASSWORD \
+              -e DB_NAME=$DB_NAME \
+              alexismendozaa/like-ms:latest
+
+            docker run -d --name users-liked-ms \
+              -p 5018:3018 \
+              -e JWT_SECRET=$JWT_SECRET \
+              -e DB_HOST=$DB_HOST \
+              -e DB_USERNAME=$DB_USERNAME \
+              -e DB_PASSWORD=$DB_PASSWORD \
+              -e DB_R=$DB_R \
+              -e DB_U=$DB_U \
+              alexismendozaa/users-liked-ms:latest

@@ -1,0 +1,54 @@
+openapi: 3.0.0
+info:
+  title: LikeMS API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /likes/{post_id}:  # Cambiamos la ruta para usar post_id
+    get:  # Usamos GET en lugar de POST
+      summary: "Listar los usuarios que dieron like a una publicación"
+      operationId: "listUsersByLike"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          description: "ID del post cuya lista de usuarios que dieron like se desea obtener"
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: "Lista de usuarios que dieron like a la publicación"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                          description: "ID del usuario"
+                        username:
+                          type: string
+                          description: "Nombre de usuario"
+                        email:
+                          type: string
+                          description: "Correo electrónico del usuario"
+        '400':
+          description: "Error en los datos proporcionados"
+        '404':
+          description: "No se encontraron usuarios para este post"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
