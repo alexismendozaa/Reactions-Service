@@ -29,7 +29,7 @@ jobs:
           for dir in count-likes-ms dislike-ms like-ms users-liked-ms; do
             cd $dir
             gem install bundler --user-install
-            bundle install
+            bundle install --path vendor/bundle
             bundle exec rake test
             cd ..
           done
