@@ -34,17 +34,23 @@ jobs:
             cd ..
           done
 
-      # Step 5: Build Docker images using Docker Compose
+      # Step 5: Set up Docker Compose (v2)
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install docker-compose-plugin
+
+      # Step 6: Build Docker images using Docker Compose
       - name: Build Docker images using Docker Compose
         run: |
-          docker-compose -f docker-compose.yml build
+          docker compose -f docker-compose.yml build
 
-      # Step 6: Push Docker images to Docker Hub
+      # Step 7: Push Docker images to Docker Hub
       - name: Push Docker images to Docker Hub
         run: |
-          docker-compose -f docker-compose.yml push
+          docker compose -f docker-compose.yml push
 
-      # Step 7: Clean up existing containers on EC2
+      # Step 8: Clean up existing containers on EC2
       - name: Clean up existing containers on EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -58,7 +64,7 @@ jobs:
             docker rm $(docker ps -aq) || true
             docker system prune -af || true
 
-      # Step 8: Deploy to EC2 via SSH
+      # Step 9: Deploy to EC2 via SSH
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
