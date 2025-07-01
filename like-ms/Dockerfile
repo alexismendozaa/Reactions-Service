@@ -10,7 +10,8 @@ RUN apt-get update -qq && \
 WORKDIR /app
 
 COPY Gemfile Gemfile.lock ./
-RUN bundle config set deployment 'true' && \
+RUN bundle config set frozen 'false' && \
+    bundle config set deployment 'true' && \
     bundle config set without 'development test' && \
     bundle install -j4 --retry 3
 
