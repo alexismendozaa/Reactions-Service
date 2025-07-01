@@ -8,7 +8,6 @@
 /_site
 
 # Gemfile.lock should be ignored if you are not using it for version control
-Gemfile.lock
 
 # Ignore environment files for each microservice
 **/.env
