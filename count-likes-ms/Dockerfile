@@ -5,6 +5,8 @@ RUN apt-get update -qq && \
     nodejs \
     postgresql-client \
     build-essential \
+    libyaml-dev \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
