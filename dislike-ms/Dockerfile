@@ -1,16 +1,25 @@
-FROM ruby:3.2
+FROM ruby:3.2-slim
 
-RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+    nodejs \
+    postgresql-client \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY Gemfile Gemfile.lock ./
-RUN bundle install
+RUN bundle config set deployment 'true' && \
+    bundle config set without 'development test' && \
+    bundle install -j4 --retry 3
 
 COPY . .
 
+# RUN bundle exec rake assets:precompile
+
 EXPOSE 3016
 
-ENV PORT 3016
+ENV PORT=3016
 
 CMD ["bundle", "exec", "puma", "-b", "tcp://0.0.0.0:3016", "-C", "config/puma.rb"]

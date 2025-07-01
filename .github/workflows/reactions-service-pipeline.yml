@@ -1,126 +1,266 @@
-name: Docker Build and Deploy
+name: CI-CD Reactions Microservices
 
 on:
   push:
-    branches:
-      - test
+    branches: [main, test]
+    paths:
+      - 'like-ms/**'
+      - 'dislike-ms/**'
+      - 'count-likes-ms/**'
+      - 'users-liked-ms/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'like-ms/**'
+      - 'dislike-ms/**'
+      - 'count-likes-ms/**'
+      - 'users-liked-ms/**'
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
-  build_and_deploy:
+  #### 1. TESTS ####
+  test:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
     steps:
-      # Step 1: Check out the code
-      - name: Check out code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Step 2: Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      # Step 3: Log in to Docker Hub
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-      # Step 4: Install dependencies for all microservices and run tests
-      - name: Install dependencies and run tests
+      - name: Detect changes for service
+        id: changes
         run: |
-          export PATH="$(ruby -e 'print Gem.user_dir')/bin:$PATH"
-          for dir in count-likes-ms dislike-ms like-ms users-liked-ms; do
-            cd $dir
-            gem install bundler --user-install
-            bundle install --path vendor/bundle
-            ruby tests/gemfile_test.rb
-            cd ..
-          done
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
 
-      # Step 5: Install Docker Compose v2 (official method)
-      - name: Install Docker Compose v2
+      - name: Run static check (if test exists)
+        if: steps.changes.outputs.changed == 'true' && hashFiles(format('{0}/tests/static_check.sh', matrix.service)) != ''
+        run: bash ${{ matrix.service }}/tests/static_check.sh
+
+  #### 2. BUILD ####
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes for service
+        id: changes
         run: |
-          sudo mkdir -p /usr/local/lib/docker/cli-plugins
-          DOCKER_COMPOSE_VERSION="v2.27.1"
-          curl -SL https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o docker-compose
-          sudo mv docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
-          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-          docker compose version
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
 
-      # Step 6: Build Docker images using Docker Compose
-      - name: Build Docker images using Docker Compose
+      - name: Build Docker image
+        if: steps.changes.outputs.changed == 'true'
         run: |
-          docker compose -f docker-compose.yml build
+          docker build -t alexismendozaa/${{ matrix.service }}:latest ./${{ matrix.service }}
 
-      # Step 7: Push Docker images to Docker Hub
-      - name: Push Docker images to Docker Hub
+      - name: Save Docker image artifact
+        if: steps.changes.outputs.changed == 'true'
+        run: docker save alexismendozaa/${{ matrix.service }}:latest -o ${{ matrix.service }}.tar
+
+      - uses: actions/upload-artifact@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          name: ${{ matrix.service }}-image
+          path: ${{ matrix.service }}.tar
+
+  #### 3. PUSH ####
+  push:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes for service
+        id: changes
         run: |
-          docker compose -f docker-compose.yml push
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
 
-      # Step 8: Clean up existing containers on EC2
-      - name: Clean up existing containers on EC2
+      - uses: actions/download-artifact@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          name: ${{ matrix.service }}-image
+
+      - name: Load Docker image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker load -i ${{ matrix.service }}.tar
+
+      - name: Login to Docker Hub
+        if: steps.changes.outputs.changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker push alexismendozaa/${{ matrix.service }}:latest
+
+  #### 4. DEPLOY TEST ####
+  deploy_test:
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.ref == 'refs/heads/test'
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy updated microservice to EC2 TEST via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.EC2_QA }}
           username: ubuntu
           key: ${{ secrets.SSH_KEY_QA }}
           port: 22
-          debug: true
           script: |
-            docker stop $(docker ps -aq) || true
-            docker rm $(docker ps -aq) || true
-            docker system prune -af || true
+            docker network inspect reactions_network >/dev/null 2>&1 || docker network create reactions_network
 
-      # Step 9: Deploy to EC2 via SSH
-      - name: Deploy to EC2 via SSH
+            docker rm -f ${{ matrix.service }} || true
+
+            docker pull alexismendozaa/${{ matrix.service }}:latest
+
+            case "${{ matrix.service }}" in
+              like-ms)
+                docker run -d --name like-ms \
+                  --network reactions_network \
+                  -p 5015:3015 \
+                  alexismendozaa/like-ms:latest
+                ;;
+              dislike-ms)
+                docker run -d --name dislike-ms \
+                  --network reactions_network \
+                  -p 5016:3016 \
+                  alexismendozaa/dislike-ms:latest
+                ;;
+              count-likes-ms)
+                docker run -d --name count-likes-ms \
+                  --network reactions_network \
+                  -p 5017:3017 \
+                  alexismendozaa/count-likes-ms:latest
+                ;;
+              users-liked-ms)
+                docker run -d --name users-liked-ms \
+                  --network reactions_network \
+                  -p 5018:3018 \
+                  alexismendozaa/users-liked-ms:latest
+                ;;
+            esac
+
+  #### 5. DEPLOY PROD ####
+  deploy_prod:
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy updated microservice to EC2 PROD via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_QA }}
+          host: ${{ secrets.EC2_PROD }}
           username: ubuntu
-          key: ${{ secrets.SSH_KEY_QA }}
+          key: ${{ secrets.SSH_KEY_PROD }}
           port: 22
-          debug: true
           script: |
-            # Export environment variables for all microservices
-            export JWT_SECRET=${{ secrets.JWT_SECRET }}
-            export DB_HOST=${{ secrets.DB_HOST }}
-            export DB_USERNAME=${{ secrets.DB_USERNAME }}
-            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            export DB_NAME=${{ secrets.DB_NAME }}
-            export DB_R=${{ secrets.DB_R }}
-            export DB_U=${{ secrets.DB_U }}
+            docker network inspect reactions_network >/dev/null 2>&1 || docker network create reactions_network
 
-            # Run containers for each microservice
-            docker run -d --name count-likes-ms \
-              -p 5017:3017 \
-              -e JWT_SECRET=$JWT_SECRET \
-              -e DB_HOST=$DB_HOST \
-              -e DB_USERNAME=$DB_USERNAME \
-              -e DB_PASSWORD=$DB_PASSWORD \
-              -e DB_NAME=$DB_NAME \
-              alexismendozaa/count-likes-ms:latest
+            docker rm -f ${{ matrix.service }} || true
 
-            docker run -d --name dislike-ms \
-              -p 5016:3016 \
-              -e JWT_SECRET=$JWT_SECRET \
-              -e DB_HOST=$DB_HOST \
-              -e DB_USERNAME=$DB_USERNAME \
-              -e DB_PASSWORD=$DB_PASSWORD \
-              -e DB_NAME=$DB_NAME \
-              alexismendozaa/dislike-ms:latest
+            docker pull alexismendozaa/${{ matrix.service }}:latest
 
-            docker run -d --name like-ms \
-              -p 5015:3015 \
-              -e JWT_SECRET=$JWT_SECRET \
-              -e DB_HOST=$DB_HOST \
-              -e DB_USERNAME=$DB_USERNAME \
-              -e DB_PASSWORD=$DB_PASSWORD \
-              -e DB_NAME=$DB_NAME \
-              alexismendozaa/like-ms:latest
-
-            docker run -d --name users-liked-ms \
-              -p 5018:3018 \
-              -e JWT_SECRET=$JWT_SECRET \
-              -e DB_HOST=$DB_HOST \
-              -e DB_USERNAME=$DB_USERNAME \
-              -e DB_PASSWORD=$DB_PASSWORD \
-              -e DB_R=$DB_R \
-              -e DB_U=$DB_U \
-              alexismendozaa/users-liked-ms:latest
+            case "${{ matrix.service }}" in
+              like-ms)
+                docker run -d --name like-ms \
+                  --network reactions_network \
+                  -p 5015:3015 \
+                  alexismendozaa/like-ms:latest
+                ;;
+              dislike-ms)
+                docker run -d --name dislike-ms \
+                  --network reactions_network \
+                  -p 5016:3016 \
+                  alexismendozaa/dislike-ms:latest
+                ;;
+              count-likes-ms)
+                docker run -d --name count-likes-ms \
+                  --network reactions_network \
+                  -p 5017:3017 \
+                  alexismendozaa/count-likes-ms:latest
+                ;;
+              users-liked-ms)
+                docker run -d --name users-liked-ms \
+                  --network reactions_network \
+                  -p 5018:3018 \
+                  alexismendozaa/users-liked-ms:latest
+                ;;
+            esac
