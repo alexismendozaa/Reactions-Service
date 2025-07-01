@@ -10,4 +10,3 @@ done < files.txt
 rm files.txt
 
 echo "Revisión completada." 
-
