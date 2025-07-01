@@ -183,29 +183,60 @@ jobs:
 
             docker pull alexismendozaa/${{ matrix.service }}:latest
 
+            export DB_HOST='${{ secrets.DB_HOST }}'
+            export DB_USERNAME='${{ secrets.DB_USERNAME }}'
+            export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+            export DB_NAME='${{ secrets.DB_NAME }}'
+            export DB_SSL='${{ secrets.DB_SSL }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+
             case "${{ matrix.service }}" in
               like-ms)
                 docker run -d --name like-ms \
                   --network reactions_network \
                   -p 5015:3015 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/like-ms:latest
                 ;;
               dislike-ms)
                 docker run -d --name dislike-ms \
                   --network reactions_network \
                   -p 5016:3016 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/dislike-ms:latest
                 ;;
               count-likes-ms)
                 docker run -d --name count-likes-ms \
                   --network reactions_network \
                   -p 5017:3017 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/count-likes-ms:latest
                 ;;
               users-liked-ms)
                 docker run -d --name users-liked-ms \
                   --network reactions_network \
                   -p 5018:3018 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/users-liked-ms:latest
                 ;;
             esac
@@ -238,29 +269,60 @@ jobs:
 
             docker pull alexismendozaa/${{ matrix.service }}:latest
 
+            export DB_HOST='${{ secrets.DB_HOST }}'
+            export DB_USERNAME='${{ secrets.DB_USERNAME }}'
+            export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+            export DB_NAME='${{ secrets.DB_NAME }}'
+            export DB_SSL='${{ secrets.DB_SSL }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+
             case "${{ matrix.service }}" in
               like-ms)
                 docker run -d --name like-ms \
                   --network reactions_network \
                   -p 5015:3015 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/like-ms:latest
                 ;;
               dislike-ms)
                 docker run -d --name dislike-ms \
                   --network reactions_network \
                   -p 5016:3016 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/dislike-ms:latest
                 ;;
               count-likes-ms)
                 docker run -d --name count-likes-ms \
                   --network reactions_network \
                   -p 5017:3017 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/count-likes-ms:latest
                 ;;
               users-liked-ms)
                 docker run -d --name users-liked-ms \
                   --network reactions_network \
                   -p 5018:3018 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
                   alexismendozaa/users-liked-ms:latest
                 ;;
             esac
