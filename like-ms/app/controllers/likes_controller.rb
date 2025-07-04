@@ -1,23 +1,30 @@
-class ReactionsController < ApplicationController
+class LikesController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:create]
-  before_action :authenticate_user # aquí asumes que tienes un método que pone @current_user
+  before_action :authenticate_user
 
   def create
-    @reaction = Reaction.new(
-      post_id: reaction_params[:post_id],
-      user_id: @current_user.id # sacado del JWT
-      # liked_at se pone solo o usa Time.current si es manual
-    )
-    if @reaction.save
-      render json: @reaction, status: :created
+    post_id = params[:post_id]
+    token = request.headers['Authorization']
+    user_id = AuthenticationService.decode(token)
+
+    return head :unauthorized unless user_id
+
+    
+    like = Reaction.new(post_id: post_id, user_id: user_id, liked_at: Time.now)
+
+    if like.save
+      render json: { message: 'Like registrado exitosamente' }, status: :created
     else
-      render json: @reaction.errors, status: :unprocessable_entity
+      render json: { error: 'No se pudo registrar el like' }, status: :unprocessable_entity
     end
   end
 
   private
 
-  def reaction_params
-    params.permit(:post_id)
+  def authenticate_user
+    token = request.headers['Authorization']
+    if token.blank? || AuthenticationService.decode(token).nil?
+      head :unauthorized
+    end
   end
 end
