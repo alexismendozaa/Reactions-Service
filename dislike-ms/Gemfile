@@ -13,14 +13,13 @@ gem "solid_cache"
 gem "solid_queue"
 gem "solid_cable"
 gem "bootsnap", require: false
-gem "kamal", require: false
 gem "thruster", require: false
 # gem "image_processing", "~> 1.2"
 
 group :development, :test do
   gem "brakeman", require: false
   gem "rubocop-rails-omakase", require: false
-  gem "dotenv"
+  gem "dotenv-rails", "~> 3.0", groups: [:development, :test]
 end
 
 group :development do
