@@ -8,7 +8,7 @@ class LikesController < ApplicationController
 
   # POST /likes
   def create
-    @like = Reaction.new(like_params)
+    @like = Like.new(like_params)
     if @like.save
       begin
         notify_like_to_java(@like.user_id, @like.post_id)
@@ -37,6 +37,6 @@ class LikesController < ApplicationController
 
   # Strong parameters
   def like_params
-    params.require(:reaction).permit(:user_id, :post_id, :reaction_type)
+    params.require(:like).permit(:user_id, :post_id, :reaction_type)
   end
 end
