@@ -1,0 +1,20 @@
+# Ruby-specific
+/.bundle
+/.gem
+/log/*
+/tmp/*
+/vendor/bundle
+/.yardoc
+/_site
+
+# Gemfile.lock should be ignored if you are not using it for version control
+
+# Ignore environment files for each microservice
+**/.env
+
+# Ignore temporary files
+*.swp
+*.swo
+
+# Ignore the test results
+/test/test-results

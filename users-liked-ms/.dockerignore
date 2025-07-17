@@ -1,0 +1,50 @@
+# .dockerignore
+
+.git/
+.gitignore
+
+# Bundler config
+.bundle/
+
+# Env files
+.env*
+.envrc
+
+# Rails master key and credentials
+/config/master.key
+/config/credentials/*.key
+
+# Log, temp, PID, and storage (keep .keep files)
+log/*
+tmp/*
+!log/.keep
+!tmp/.keep
+tmp/pids/*
+!tmp/pids/.keep
+storage/*
+!storage/.keep
+tmp/storage/*
+!tmp/storage/.keep
+
+# Node modules and assets
+node_modules/
+app/assets/builds/*
+!app/assets/builds/.keep
+public/assets
+
+# CI, dev, and infra
+.github/
+config/deploy*.yml
+.kamal/
+.devcontainer/
+
+# Dockerfiles themselves (optional)
+Dockerfile*
+.dockerignore
+
+# Tests and specs (crucial para minimizar expuestos)
+test/
+spec/
+features/
+docs/
+examples/

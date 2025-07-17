@@ -1,0 +1,42 @@
+openapi: 3.0.0
+info:
+  title: LikeMS API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /likes/{post_id}:  
+    get:  
+      summary: "Contar los likes de una publicación"
+      operationId: "countLikes"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          description: "ID del post cuyo número de likes se desea contar"
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: "Número de likes en la publicación"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  likes_count:
+                    type: integer
+                    description: "Cantidad de likes en la publicación"
+        '400':
+          description: "Error en los datos proporcionados"
+        '404':
+          description: "No se encontró la publicación"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization

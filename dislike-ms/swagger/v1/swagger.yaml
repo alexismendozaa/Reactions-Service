@@ -1,0 +1,38 @@
+openapi: 3.0.0
+info:
+  title: LikeMS API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /dislike:  
+    delete:  
+      summary: "Eliminar un like (Dislike)"
+      operationId: "deleteLike"
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        description: "JSON con el ID del post al que se le eliminará el like"
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                post_id:
+                  type: string
+                  format: uuid
+                  description: "ID del post al que se le eliminará el like"
+      responses:
+        '200':
+          description: "Like eliminado exitosamente"
+        '400':
+          description: "Error en los datos proporcionados"
+        '404':
+          description: "No se pudo encontrar el like"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization

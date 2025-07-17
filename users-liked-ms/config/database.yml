@@ -1,0 +1,24 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  username: 'alexis'  # Usuario de la base de datos
+  password: 'admin123'  # Contraseña de la base de datos
+  host: 'lumisnap-db.cpiel8qemsnc.us-east-1.rds.amazonaws.com'  # Dirección del host de la base de datos en RDS
+  port: 5432  # Puerto de la base de datos, 5432 es el predeterminado para PostgreSQL
+
+development:
+  <<: *default
+  database: 'reactions'  # Base de datos para el entorno de desarrollo
+
+production:
+  <<: *default
+  database: 'reactions'  # Base de datos para el entorno de producción
+  username: 'alexis'  # Nombre de usuario en producción
+  password: 'admin123'  # Contraseña en producción
+  host: 'lumisnap-db.cpiel8qemsnc.us-east-1.rds.amazonaws.com'  # Host de producción
+
+users:
+  <<: *default
+  database: 'users'  # Base de datos para los usuarios
+  host: 'lumisnap-db.cpiel8qemsnc.us-east-1.rds.amazonaws.com'  # Host para la base de datos de usuarios

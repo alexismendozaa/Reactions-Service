@@ -1,0 +1,328 @@
+name: CI-CD Reactions Microservices
+
+on:
+  push:
+    branches: [main, test]
+    paths:
+      - 'like-ms/**'
+      - 'dislike-ms/**'
+      - 'count-likes-ms/**'
+      - 'users-liked-ms/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'like-ms/**'
+      - 'dislike-ms/**'
+      - 'count-likes-ms/**'
+      - 'users-liked-ms/**'
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+jobs:
+  #### 1. TESTS ####
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes for service
+        id: changes
+        run: |
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run static check (if test exists)
+        if: steps.changes.outputs.changed == 'true' && hashFiles(format('{0}/tests/static_check.sh', matrix.service)) != ''
+        run: bash ${{ matrix.service }}/tests/static_check.sh
+
+  #### 2. BUILD ####
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes for service
+        id: changes
+        run: |
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          docker build -t alexismendozaa/${{ matrix.service }}:latest ./${{ matrix.service }}
+
+      - name: Save Docker image artifact
+        if: steps.changes.outputs.changed == 'true'
+        run: docker save alexismendozaa/${{ matrix.service }}:latest -o ${{ matrix.service }}.tar
+
+      - uses: actions/upload-artifact@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          name: ${{ matrix.service }}-image
+          path: ${{ matrix.service }}.tar
+
+  #### 3. PUSH ####
+  push:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes for service
+        id: changes
+        run: |
+          git fetch --prune --unshallow || git fetch --all
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^${{ matrix.service }}/" || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep "^${{ matrix.service }}/" || true)
+          fi
+          if [[ -n "$CHANGED" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          name: ${{ matrix.service }}-image
+
+      - name: Load Docker image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker load -i ${{ matrix.service }}.tar
+
+      - name: Login to Docker Hub
+        if: steps.changes.outputs.changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker push alexismendozaa/${{ matrix.service }}:latest
+
+  #### 4. DEPLOY TEST ####
+  deploy_test:
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.ref == 'refs/heads/test'
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy updated microservice to EC2 TEST via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_QA }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY_QA }}
+          port: 22
+          script: |
+            docker network inspect reactions_network >/dev/null 2>&1 || docker network create reactions_network
+
+            docker rm -f ${{ matrix.service }} || true
+
+            docker pull alexismendozaa/${{ matrix.service }}:latest
+
+            export DB_HOST='${{ secrets.DB_HOST }}'
+            export DB_USERNAME='${{ secrets.DB_USERNAME }}'
+            export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+            export DB_NAME='${{ secrets.DB_NAME }}'
+            export DB_SSL='${{ secrets.DB_SSL }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+
+            case "${{ matrix.service }}" in
+              like-ms)
+                docker run -d --name like-ms \
+                  --network reactions_network \
+                  -p 5015:3015 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/like-ms:latest
+                ;;
+              dislike-ms)
+                docker run -d --name dislike-ms \
+                  --network reactions_network \
+                  -p 5016:3016 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/dislike-ms:latest
+                ;;
+              count-likes-ms)
+                docker run -d --name count-likes-ms \
+                  --network reactions_network \
+                  -p 5017:3017 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/count-likes-ms:latest
+                ;;
+              users-liked-ms)
+                docker run -d --name users-liked-ms \
+                  --network reactions_network \
+                  -p 5018:3018 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/users-liked-ms:latest
+                ;;
+            esac
+
+  #### 5. DEPLOY PROD ####
+  deploy_prod:
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service:
+          - like-ms
+          - dislike-ms
+          - count-likes-ms
+          - users-liked-ms
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy updated microservice to EC2 PROD via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_PROD }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY_PROD }}
+          port: 22
+          script: |
+            docker network inspect reactions_network >/dev/null 2>&1 || docker network create reactions_network
+
+            docker rm -f ${{ matrix.service }} || true
+
+            docker pull alexismendozaa/${{ matrix.service }}:latest
+
+            export DB_HOST='${{ secrets.DB_HOST }}'
+            export DB_USERNAME='${{ secrets.DB_USERNAME }}'
+            export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+            export DB_NAME='${{ secrets.DB_NAME }}'
+            export DB_SSL='${{ secrets.DB_SSL }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+
+            case "${{ matrix.service }}" in
+              like-ms)
+                docker run -d --name like-ms \
+                  --network reactions_network \
+                  -p 5015:3015 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/like-ms:latest
+                ;;
+              dislike-ms)
+                docker run -d --name dislike-ms \
+                  --network reactions_network \
+                  -p 5016:3016 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/dislike-ms:latest
+                ;;
+              count-likes-ms)
+                docker run -d --name count-likes-ms \
+                  --network reactions_network \
+                  -p 5017:3017 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/count-likes-ms:latest
+                ;;
+              users-liked-ms)
+                docker run -d --name users-liked-ms \
+                  --network reactions_network \
+                  -p 5018:3018 \
+                  -e DB_HOST=$DB_HOST \
+                  -e DB_USERNAME=$DB_USERNAME \
+                  -e DB_PASSWORD=$DB_PASSWORD \
+                  -e DB_NAME=$DB_NAME \
+                  -e DB_SSL=$DB_SSL \
+                  -e JWT_SECRET=$JWT_SECRET \
+                  alexismendozaa/users-liked-ms:latest
+                ;;
+            esac

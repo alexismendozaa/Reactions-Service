@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package reaction;
+
+service ReactionService {
+  rpc CreateLike (CreateLikeRequest) returns (CreateLikeResponse);
+}
+
+message CreateLikeRequest {
+  string post_id = 1;
+  string user_id = 2;
+}
+
+message CreateLikeResponse {
+  string message = 1;
+}

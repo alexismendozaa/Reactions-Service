@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  count-likes-ms:
+    build:
+      context: ./count-likes-ms
+    image: alexismendozaa/count-likes-ms:latest
+    ports:
+      - "5017:3017"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - user_service_network
+
+  dislike-ms:
+    build:
+      context: ./dislike-ms
+    image: alexismendozaa/dislike-ms:latest
+    ports:
+      - "5016:3016"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - user_service_network
+
+  like-ms:
+    build:
+      context: ./like-ms
+    image: alexismendozaa/like-ms:latest
+    ports:
+      - "5015:3015"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - user_service_network
+
+  users-liked-ms:
+    build:
+      context: ./users-liked-ms
+    image: alexismendozaa/users-liked-ms:latest
+    ports:
+      - "5018:3018"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_R=${DB_R}
+      - DB_U=${DB_U}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - user_service_network
+
+networks:
+  user_service_network:
+    driver: bridge
